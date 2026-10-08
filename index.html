@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>하예라 연수 일정</title>
+    <!-- Firebase SDK (실시간 데이터베이스 연동용) -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+    <style>
+        body { font-family: 'Malgun Gothic', sans-serif; background-color: #f0f2f5; margin: 0; padding: 20px; color: #333; }
+        .header { text-align: center; margin-bottom: 20px; }
+        .header h2 { display: flex; justify-content: center; align-items: center; gap: 10px; margin-bottom: 10px; }
+        
+        .tabs { display: flex; justify-content: center; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+        .tab-btn { padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; font-size: 15px; font-weight: bold; background: #ddd; transition: 0.3s; }
+        .tab-btn.active { background: #4F46E5; color: white; }
+        
+        .container { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); max-width: 1400px; margin: 0 auto; display: none; }
+        .container.active { display: block; }
+        
+        h3 { margin-top: 0; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        input[type="text"], select, button { padding: 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; box-sizing: border-box; }
+        button { cursor: pointer; background: #4F46E5; color: white; border: none; font-weight: bold; }
+        button:hover { background: #4338CA; }
+
+        .schedule-controls { background: #f8fafc; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #e2e8f0; }
+        .form-row { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; align-items: center; }
+        
+        .week-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px; overflow-x: auto; min-width: 950px; }
+        .day-column { background: #f8fafc; border-radius: 8px; padding: 10px; border: 1px solid #e2e8f0; min-height: 400px; }
+        .day-title { text-align: center; font-weight: bold; padding-bottom: 5px; margin-bottom: 5px; }
+        
+        .day-date-display { text-align: center; font-size: 13px; font-weight: bold; color: #475569; margin-bottom: 10px; padding-bottom: 5px; border-bottom: 2px solid #e2e8f0; }
+
+        .day-column:nth-child(6) .day-title { color: #2563eb; }
+        .day-column:nth-child(7) .day-title { color: #dc2626; }
+
+        .schedule-card { background: white; border: 1px solid #cbd5e1; border-left: 4px solid #4F46E5; padding: 10px; border-radius: 6px; margin-bottom: 10px; font-size: 13px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
+        .sch-time { font-weight: bold; color: #4F46E5; margin-bottom: 5px; font-size: 13px; background: #eef2ff; padding: 4px; border-radius: 4px; text-align: center; }
+        .sch-stage { font-weight: bold; font-size: 15px; margin-bottom: 5px; }
+        .sch-rep { font-size: 12px; color: #d97706; margin-bottom: 5px; font-weight: bold; }
+        .sch-members { color: #333; margin-bottom: 4px; }
+        .sch-remark { color: #0f766e; font-size: 12px; margin-top: 6px; background: #ccfbf1; padding: 6px; border-radius: 4px; border: 1px solid #99f6e4; word-break: break-all; }
+        
+        .personal-card { border-left-color: #ec4899; background-color: #fdf2f8; }
+        .personal-card .sch-time { color: #be185d; background: #fce7f3; }
+        .personal-card .sch-stage { color: #be185d; }
+        .sch-type-badge { background: #ec4899; color: white; display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: bold; margin-bottom: 5px; }
+
+        #syncStatus { text-align: center; font-size: 12px; color: #10b981; margin-bottom: 10px; font-weight: bold; }
+        .all-possible-bar { background: #f0fdf4; border: 1px solid #bbf7d0; padding: 10px 15px; border-radius: 6px; margin-bottom: 15px; display: flex; align-items: center; gap: 8px; font-weight: bold; color: #166534; cursor: pointer; }
+
+        .submit-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px; overflow-x: auto; min-width: 950px; margin-top: 15px; }
+        .bulk-box-am { background: #eff6ff; border: 1px solid #bfdbfe; padding: 8px; border-radius: 6px; margin-bottom: 8px; font-size: 12px; }
+        .bulk-box-am label { font-weight: bold; color: #1d4ed8; display: flex; align-items: center; gap: 4px; cursor: pointer; margin-bottom: 4px; }
+        .bulk-box-am input[type="text"] { width: 100%; padding: 4px; font-size: 11px; border: 1px solid #93c5fd; border-radius: 4px; }
+        
+        .bulk-box-pm { background: #fff7ed; border: 1px solid #fed7aa; padding: 8px; border-radius: 6px; margin-bottom: 12px; font-size: 12px; }
+        .bulk-box-pm label { font-weight: bold; color: #c2410c; display: flex; align-items: center; gap: 4px; cursor: pointer; margin-bottom: 4px; }
+        .bulk-box-pm input[type="text"] { width: 100%; padding: 4px; font-size: 11px; border: 1px solid #fdba74; border-radius: 4px; }
+
+        .submit-slot-am { background: #f8fafc; border: 1px solid #cbd5e1; padding: 6px; border-radius: 6px; margin-bottom: 6px; font-size: 12px; }
+        .submit-slot-am label { font-weight: bold; display: flex; align-items: center; gap: 4px; cursor: pointer; color: #1d4ed8; margin-bottom: 4px; }
+        .submit-slot-am input[type="text"] { width: 100%; padding: 4px; font-size: 11px; margin-top: 2px; border: 1px solid #cbd5e1; border-radius: 4px; }
+
+        .submit-slot-pm { background: #fffbeb; border: 1px solid #fde68a; padding: 6px; border-radius: 6px; margin-bottom: 6px; font-size: 12px; }
+        .submit-slot-pm label { font-weight: bold; display: flex; align-items: center; gap: 4px; cursor: pointer; color: #c2410c; margin-bottom: 4px; }
+        .submit-slot-pm input[type="text"] { width: 100%; padding: 4px; font-size: 11px; margin-top: 2px; border: 1px solid #fde68a; border-radius: 4px; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h2>🕊️ 하예라 연수 일정 시스템 🕊️</h2>
+        <div id="syncStatus">🔄 서버와 실시간 연결 중...</div>
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('submit')">1. 일정 제출</button>
+            <button class="tab-btn" onclick="switchTab('personal')">2. 개인별 일정 확인</button>
+        </div>
+    </div>
+
+    <!-- 1. 일정 제출 화면 -->
+    <div id="submit-view" class="container active">
+        <div class="schedule-controls">
+            <h3>개인별 불가능한 시간 및 사유 제출</h3>
+            <div class="form-row">
+                <select id="submitNameSelect" onchange="loadMySubmission()" style="min-width: 250px; font-size: 15px;">
+                    <option value="">본인 이름을 선택하세요</option>
+                </select>
+                <button onclick="submitUnavailableTimes()" style="background: #10b981; padding: 10px 20px;">제출하기</button>
+            </div>
+
+            <div class="all-possible-bar">
+                <label style="cursor: pointer; display: flex; align-items: center; gap: 8px; width: 100%;">
+                    <input type="checkbox" id="allPossibleChk" onchange="toggleAllPossible()" style="width: 18px; height: 18px;"> 🌟 모두 가능 (모든 시간대 참여 가능)
+                </label>
+            </div>
+        </div>
+        <div class="submit-grid" id="submitWeekGrid"></div>
+    </div>
+
+    <!-- 2. 개인별 일정 확인 화면 -->
+    <div id="personal-view" class="container">
+        <div class="schedule-controls" style="text-align: center;">
+            <h3>내 일정 모아보기</h3>
+            <p style="font-size: 14px; color: #666; margin-bottom: 10px;">이름을 선택하면 해당 인원이 포함된 일정만 주간 달력에 표시됩니다.</p>
+            <select id="personalNameSelect" onchange="renderPersonalSchedules()" style="min-width: 250px; font-size: 16px; text-align: center;">
+                <option value="">이름을 선택하세요</option>
+            </select>
+        </div>
+        <div class="week-grid" id="personalWeekGrid"></div>
+    </div>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyAK-pQMQkowWyQcYpLKc9cdIvxAgQ3nGIg",
+            authDomain: "hayeraschedule.firebaseapp.com",
+            databaseURL: "https://hayeraschedule-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "hayeraschedule",
+            storageBucket: "hayeraschedule.firebasestorage.app",
+            messagingSenderId: "585338193163",
+            appId: "1:585338193163:web:92a95c7eedc916a0020e0e",
+            measurementId: "G-XWVNGLVQDM"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
+        let stages = [];
+        let schedules = [];
+        let submitDates = ['', '', '', '', '', '', ''];
+        let scheduleDates = ['', '', '', '', '', '', ''];
+        let unavailabilities = [];
+
+        window.onload = () => {
+            initGrid('personalWeekGrid', false);
+            initSubmitGrid();
+            initRealtimeSync();
+        };
+
+        function initRealtimeSync() {
+            db.collection("stages").onSnapshot((snapshot) => {
+                stages = [];
+                snapshot.forEach((doc) => { stages.push({ id: doc.id, ...doc.data() }); });
+                updateSubmitNameDropdown();
+                updatePersonalDropdown();
+            });
+
+            db.collection("schedules").onSnapshot((snapshot) => {
+                schedules = [];
+                snapshot.forEach((doc) => { schedules.push({ id: doc.id, ...doc.data() }); });
+                renderPersonalSchedules();
+            });
+
+            db.collection("settings").doc("submitDates").onSnapshot((doc) => {
+                if (doc.exists) {
+                    submitDates = doc.data().dates || ['', '', '', '', '', '', ''];
+                    initSubmitGrid(); 
+                }
+            });
+
+            db.collection("settings").doc("scheduleDates").onSnapshot((doc) => {
+                if (doc.exists) {
+                    scheduleDates = doc.data().dates || ['', '', '', '', '', '', ''];
+                    initGrid('personalWeekGrid', false);
+                    renderPersonalSchedules();
+                }
+            });
+
+            db.collection("unavailabilities").onSnapshot((snapshot) => {
+                unavailabilities = [];
+                snapshot.forEach((doc) => { unavailabilities.push({ id: doc.id, ...doc.data() }); });
+                loadMySubmission();
+            });
+
+            document.getElementById('syncStatus').innerText = "🟢 실시간 동기화 활성화됨";
+        }
+
+        function initGrid(gridId, isEditMode) {
+            const grid = document.getElementById(gridId);
+            const days = ['월요일', '화요일', '수요일', '목요일', '금요일', '토요일', '일요일'];
+            grid.innerHTML = '';
+            days.forEach((day, index) => {
+                let dateElement = `<div class="day-date-display">${scheduleDates[index] || '날짜 미지정'}</div>`;
+                grid.innerHTML += `
+                    <div class="day-column" id="${gridId}-day-${index}">
+                        <div>
+                            <div class="day-title">${day}</div>
+                            ${dateElement}
+                        </div>
+                        <div class="sch-list"></div>
+                    </div>
+                `;
+            });
+        }
+
+        function initSubmitGrid() {
+            const grid = document.getElementById('submitWeekGrid');
+            const days = ['월요일', '화요일', '수요일', '목요일', '금요일', '토요일', '일요일'];
+            grid.innerHTML = '';
+
+            days.forEach((day, dayIndex) => {
+                // 참가자용 화면에는 입력창이 아니라 관리자가 지정한 날짜가 텍스트로 표시됨
+                let dateElement = `<div class="day-date-display">${submitDates[dayIndex] || '날짜 미지정'}</div>`;
+                
+                let slotsHtml = `
+                    <div class="bulk-box-am">
+                        <label><input type="checkbox" class="bulk-am-chk" data-day="${dayIndex}" onchange="toggleBulkAm(${dayIndex})"> ☀️ 오전 전체 불가</label>
+                        <input type="text" class="bulk-am-reason" placeholder="오전 전체 사유 입력" style="display: none;" data-day="${dayIndex}">
+                    </div>
+                    <div class="bulk-box-pm">
+                        <label><input type="checkbox" class="bulk-pm-chk" data-day="${dayIndex}" onchange="toggleBulkPm(${dayIndex})"> 🌙 오후 전체 불가</label>
+                        <input type="text" class="bulk-pm-reason" placeholder="오후 전체 사유 입력" style="display: none;" data-day="${dayIndex}">
+                    </div>
+                `;
+                
+                for(let h = 5; h < 24; h++) {
+                    if (h >= 9 && h <= 17) continue;
+                    let startH = h.toString().padStart(2, '0') + ':00';
+                    let endH = (h + 1).toString().padStart(2, '0') + ':00';
+                    let slotTimeStr = `${startH} - ${endH}`;
+                    let isAm = h < 9;
+                    let slotClass = isAm ? 'submit-slot-am' : 'submit-slot-pm';
+                    
+                    slotsHtml += `
+                        <div class="${slotClass}" data-time-type="${isAm ? 'am' : 'pm'}">
+                            <label><input type="checkbox" class="unavail-chk" data-day="${dayIndex}" data-time="${slotTimeStr}" onchange="toggleReasonInput(this)"> ${slotTimeStr}</label>
+                            <input type="text" class="unavail-reason" placeholder="사유 입력" style="display: none;" data-day="${dayIndex}" data-time="${slotTimeStr}">
+                        </div>
+                    `;
+                }
+
+                grid.innerHTML += `
+                    <div class="day-column">
+                        <div style="border-bottom: 2px solid #e2e8f0; margin-bottom: 10px;">
+                            <div class="day-title">${day}</div>
+                            ${dateElement}
+                        </div>
+                        ${slotsHtml}
+                    </div>
+                `;
+            });
+        }
+
+        function toggleReasonInput(checkbox) {
+            const box = checkbox.closest('.submit-slot-am, .submit-slot-pm');
+            const reasonInput = box.querySelector('.unavail-reason');
+            if(checkbox.checked) {
+                reasonInput.style.display = 'block';
+                document.getElementById('allPossibleChk').checked = false;
+            } else {
+                reasonInput.style.display = 'none';
+                reasonInput.value = '';
+            }
+        }
+
+        function toggleAllPossible() {
+            const isChecked = document.getElementById('allPossibleChk').checked;
+            if (isChecked) {
+                document.querySelectorAll('.unavail-chk, .bulk-am-chk, .bulk-pm-chk').forEach(cb => cb.checked = false);
+                document.querySelectorAll('.unavail-reason, .bulk-am-reason, .bulk-pm-reason').forEach(input => {
+                    input.style.display = 'none';
+                    input.value = '';
+                });
+            }
+        }
+
+        function toggleBulkAm(dayIndex) {
+            const col = document.querySelectorAll('.submit-grid .day-column')[dayIndex];
+            const bulkChk = col.querySelector('.bulk-am-chk');
+            const reasonInput = col.querySelector('.bulk-am-reason');
+            if(bulkChk.checked) {
+                document.getElementById('allPossibleChk').checked = false;
+                reasonInput.style.display = 'block';
+                col.querySelectorAll('.submit-slot-am').forEach(box => {
+                    box.querySelector('.unavail-chk').checked = true;
+                    box.querySelector('.unavail-reason').style.display = 'none';
+                });
+            } else {
+                reasonInput.style.display = 'none';
+                reasonInput.value = '';
+                col.querySelectorAll('.submit-slot-am').forEach(box => { box.querySelector('.unavail-chk').checked = false; });
+            }
+        }
+
+        function toggleBulkPm(dayIndex) {
+            const col = document.querySelectorAll('.submit-grid .day-column')[dayIndex];
+            const bulkChk = col.querySelector('.bulk-pm-chk');
+            const reasonInput = col.querySelector('.bulk-pm-reason');
+            if(bulkChk.checked) {
+                document.getElementById('allPossibleChk').checked = false;
+                reasonInput.style.display = 'block';
+                col.querySelectorAll('.submit-slot-pm').forEach(box => {
+                    box.querySelector('.unavail-chk').checked = true;
+                    box.querySelector('.unavail-reason').style.display = 'none';
+                });
+            } else {
+                reasonInput.style.display = 'none';
+                reasonInput.value = '';
+                col.querySelectorAll('.submit-slot-pm').forEach(box => { box.querySelector('.unavail-chk').checked = false; });
+            }
+        }
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.container').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+            document.getElementById(tabId + '-view').classList.add('active');
+            event.target.classList.add('active');
+
+            if (tabId === 'personal') {
+                updatePersonalDropdown();
+                renderPersonalSchedules();
+            } else if (tabId === 'submit') {
+                updateSubmitNameDropdown();
+                loadMySubmission();
+            }
+        }
+
+        function updateSubmitNameDropdown() {
+            const select = document.getElementById('submitNameSelect');
+            let allNames = new Set();
+            stages.forEach(stage => stage.members.forEach(m => allNames.add(m)));
+            const currentSelected = select.value;
+            select.innerHTML = '<option value="">본인 이름을 선택하세요</option>';
+            [...allNames].sort().forEach(name => {
+                select.innerHTML += `<option value="${name}">${name}</option>`;
+            });
+            if(currentSelected && allNames.has(currentSelected)) select.value = currentSelected;
+        }
+
+        function loadMySubmission() {
+            const name = document.getElementById('submitNameSelect').value;
+            document.querySelectorAll('.unavail-chk').forEach(cb => { cb.checked = false; toggleReasonInput(cb); });
+            document.querySelectorAll('.bulk-am-chk, .bulk-pm-chk').forEach(cb => {
+                cb.checked = false;
+                cb.closest('.day-column').querySelector(cb.classList.contains('bulk-am-chk') ? '.bulk-am-reason' : '.bulk-pm-reason').style.display = 'none';
+            });
+            document.getElementById('allPossibleChk').checked = false;
+
+            if (!name) return;
+            const myRecord = unavailabilities.find(u => u.name === name);
+            if (myRecord) {
+                if (myRecord.isAllPossible) {
+                    document.getElementById('allPossibleChk').checked = true;
+                    return;
+                }
+                if (myRecord.slots) {
+                    let dayAmSlots = {}, dayPmSlots = {};
+                    myRecord.slots.forEach(slot => {
+                        let h = parseInt(slot.time.split(':')[0]);
+                        if (h < 9) {
+                            if(!dayAmSlots[slot.day]) dayAmSlots[slot.day] = [];
+                            dayAmSlots[slot.day].push(slot);
+                        } else {
+                            if(!dayPmSlots[slot.day]) dayPmSlots[slot.day] = [];
+                            dayPmSlots[slot.day].push(slot);
+                        }
+                    });
+
+                    for(let d=0; d<7; d++) {
+                        const cols = document.querySelectorAll('.submit-grid .day-column');
+                        if(dayAmSlots[d] && dayAmSlots[d].length === 4) {
+                            cols[d].querySelector('.bulk-am-chk').checked = true;
+                            let rInput = cols[d].querySelector('.bulk-am-reason');
+                            rInput.style.display = 'block';
+                            rInput.value = dayAmSlots[d][0].reason.replace('[오전 전체] ', '') || '';
+                        } else if(dayAmSlots[d]) {
+                            dayAmSlots[d].forEach(slot => {
+                                let chk = cols[d].querySelector(`.unavail-chk[data-time="${slot.time}"]`);
+                                if(chk) { chk.checked = true; toggleReasonInput(chk); chk.closest('.submit-slot-am').querySelector('.unavail-reason').value = slot.reason; }
+                            });
+                        }
+
+                        if(dayPmSlots[d] && dayPmSlots[d].length === 6) {
+                            cols[d].querySelector('.bulk-pm-chk').checked = true;
+                            let rInput = cols[d].querySelector('.bulk-pm-reason');
+                            rInput.style.display = 'block';
+                            rInput.value = dayPmSlots[d][0].reason.replace('[오후 전체] ', '') || '';
+                        } else if(dayPmSlots[d]) {
+                            dayPmSlots[d].forEach(slot => {
+                                let chk = cols[d].querySelector(`.unavail-chk[data-time="${slot.time}"]`);
+                                if(chk) { chk.checked = true; toggleReasonInput(chk); chk.closest('.submit-slot-pm').querySelector('.unavail-reason').value = slot.reason; }
+                            });
+                        }
+                    }
+                }
+            }
+        }
+
+        function submitUnavailableTimes() {
+            const name = document.getElementById('submitNameSelect').value;
+            if (!name) { alert('본인 이름을 선택하세요.'); return; }
+
+            const isAllPossible = document.getElementById('allPossibleChk').checked;
+            let unavailableSlots = [], isValid = true;
+
+            if (!isAllPossible) {
+                const cols = document.querySelectorAll('.submit-grid .day-column');
+                cols.forEach((col, dayIndex) => {
+                    let bulkAmChk = col.querySelector('.bulk-am-chk'), bulkAmReason = col.querySelector('.bulk-am-reason').value.trim();
+                    let bulkPmChk = col.querySelector('.bulk-pm-chk'), bulkPmReason = col.querySelector('.bulk-pm-reason').value.trim();
+
+                    if (bulkAmChk.checked) {
+                        if (!bulkAmReason) { alert(`${dayIndex + 1}번째 요일의 '오전 전체 불가' 사유를 입력해주세요.`); isValid = false; return; }
+                        for(let h=5; h<9; h++) {
+                            unavailableSlots.push({ day: dayIndex, time: `${h.toString().padStart(2,'0')}:00 - ${(h+1).toString().padStart(2,'0')}:00`, reason: `[오전 전체] ${bulkAmReason}` });
+                        }
+                    }
+                    if (bulkPmChk.checked) {
+                        if (!bulkPmReason) { alert(`${dayIndex + 1}번째 요일의 '오후 전체 불가' 사유를 입력해주세요.`); isValid = false; return; }
+                        for(let h=18; h<24; h++) {
+                            unavailableSlots.push({ day: dayIndex, time: `${h.toString().padStart(2,'0')}:00 - ${(h+1).toString().padStart(2,'0')}:00`, reason: `[오후 전체] ${bulkPmReason}` });
+                        }
+                    }
+
+                    col.querySelectorAll('.unavail-chk:checked').forEach(cb => {
+                        let h = parseInt(cb.getAttribute('data-time').split(':')[0]);
+                        if ((h < 9 && !bulkAmChk.checked) || (h >= 18 && !bulkPmChk.checked)) {
+                            let box = cb.closest('.submit-slot-am, .submit-slot-pm'), reasonInput = box.querySelector('.unavail-reason'), reason = reasonInput.value.trim();
+                            if (!reason) { alert(`체크하신 시간의 사유를 입력해주세요.`); isValid = false; return; }
+                            unavailableSlots.push({ day: dayIndex, time: cb.getAttribute('data-time'), reason: reason });
+                        }
+                    });
+                });
+                if (!isValid) return;
+                if (unavailableSlots.length === 0) { alert('불가능한 시간을 최소 한 개 이상 체크하거나 "모두 가능"에 체크해주세요.'); return; }
+            }
+
+            const existingRecord = unavailabilities.find(u => u.name === name);
+            const dataToSave = { name, isAllPossible, slots: unavailableSlots, updatedAt: new Date().toISOString() };
+
+            let promise = existingRecord ? db.collection("unavailabilities").doc(existingRecord.id).set(dataToSave) : db.collection("unavailabilities").add(dataToSave);
+            promise.then(() => alert('제출 완료')).catch(err => alert('실패: ' + err.message));
+        }
+
+        function updatePersonalDropdown() {
+            const select = document.getElementById('personalNameSelect');
+            let allNames = new Set();
+            stages.forEach(stage => stage.members.forEach(m => allNames.add(m)));
+            schedules.forEach(sch => sch.participants.forEach(p => allNames.add(p)));
+            const currentSelected = select.value;
+            select.innerHTML = '<option value="">이름을 선택하세요</option>';
+            [...allNames].sort().forEach(name => { select.innerHTML += `<option value="${name}">${name}</option>`; });
+            if(currentSelected && allNames.has(currentSelected)) select.value = currentSelected;
+        }
+
+        function renderPersonalSchedules() {
+            const selectedName = document.getElementById('personalNameSelect').value;
+            for (let i = 0; i < 7; i++) {
+                let target = document.querySelector(`#personalWeekGrid-day-${i} .sch-list`);
+                if(target) target.innerHTML = '';
+            }
+            if (!selectedName) return;
+
+            schedules.sort((a, b) => a.startTime.localeCompare(b.startTime)).forEach(sch => {
+                if (sch.participants.includes(selectedName)) {
+                    let list = document.querySelector(`#personalWeekGrid-day-${sch.day} .sch-list`);
+                    if(list) {
+                        let isPersonal = sch.type === 'personal';
+                        list.innerHTML += `
+                            <div class="schedule-card ${isPersonal ? 'personal-card' : ''}">
+                                ${isPersonal ? '<div class="sch-type-badge">개인 연수</div>' : ''}
+                                <div class="sch-time">⏰ ${sch.startTime} ~ ${sch.endTime}</div>
+                                <div class="sch-stage">${sch.stageName}</div>
+                                ${(!isPersonal && sch.rep) ? `<div class="sch-rep">👑 곡장: ${sch.rep}</div>` : ''}
+                                <div class="sch-members">✅ 참가: ${sch.participants.join(', ')}</div>
+                                ${sch.remark ? `<div class="sch-remark">📝 비고: ${sch.remark}</div>` : ''}
+                            </div>
+                        `;
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+</html>
